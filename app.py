@@ -345,7 +345,7 @@ st.markdown("---")
 # -------------------------
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📊 Data & EDA", 
-    "📈 Charts (Trend/Returns)", 
+    "📈 Charts (Trend/Vol/Returns)", 
     "📦 Hist", 
     "🚨 Outliers & Extreme", 
     "💡 Recommendation"
@@ -485,7 +485,7 @@ with tab2:
     st.plotly_chart(fig_cumulative, use_container_width=True)
     
     st.markdown("---")
-    
+
 with tab3:
     st.subheader("Histogram (per fitur)")
     cols_to_plot = ['Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume']
