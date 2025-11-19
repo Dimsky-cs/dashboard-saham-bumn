@@ -1,4 +1,3 @@
-# app.py — Unified Dashboard (FINAL: USER CODE BASE + BEAUTIFUL TAB 4)
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -28,7 +27,7 @@ MASTER_CSV = os.path.join(DATA_FOLDER, "combined_2014_2024.csv")
 BANK_ICONS = {
     "BBRI": "BBRI",
     "BBNI": "BBNI",
-    "BMRI": "BMRI",
+    "BMRI": "BMandiri",
     "BBTN": "BBTN"
 }
 
@@ -181,8 +180,8 @@ def load_all_csvs() -> Tuple[Dict[str, pd.DataFrame], pd.DataFrame]:
         if os.path.exists(path):
             df = safe_read_csv(path)
             if df is not None:
-                df = df.dropna()          # Buang baris kosong
-                df = df.drop_duplicates() # Buang data ganda
+                df = df.dropna() 
+                df = df.drop_duplicates()
                 datasets[bank] = df
                 tmp = df.copy().reset_index()
                 tmp['Bank'] = bank
@@ -198,38 +197,36 @@ def load_all_csvs() -> Tuple[Dict[str, pd.DataFrame], pd.DataFrame]:
 # -------------------------
 # METRIC CALCULATION
 # -------------------------
+# -------------------------
+# METRIC CALCULATION (SUDAH DIPERBAIKI)
+# -------------------------
 @st.cache_data
 def get_all_metrics(_datasets: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     """Menghitung semua metrik (Return, Vol, CumReturn) SATU KALI."""
     metrics_list = []
     for bank, dfb in _datasets.items():
-        if dfb is None or dfb.empty:
-            continue
-            
+        if dfb is None or dfb.empty: continue
         pc = detect_price_col(dfb)
-        if pc is None:
-            continue
-            
+        if pc is None: continue
         df = dfb.copy()
         df[pc] = pd.to_numeric(df[pc], errors='coerce')
         df = df.dropna(subset=[pc])
         
         df['Return'] = df[pc].pct_change()
+        
+        # <<< BARIS KRUSIAL VOLATILITAS DITAMBAHKAN KEMBALI >>>
+        df['Volatility_30d'] = df['Return'].rolling(window=30).std() * np.sqrt(252)
+        
         df['Cumulative_Return'] = (1 + df['Return']).cumprod()
         df['Daily_Return_Pct'] = df['Return'] * 100
         df['Harga'] = df[pc]
         
-        df = df.dropna(subset=['Return', 'Cumulative_Return', 'Daily_Return_Pct'])
+        # Memastikan Volatilitas 30d disertakan dalam dropna subset
+        df = df.dropna(subset=['Return', 'Volatility_30d', 'Cumulative_Return', 'Daily_Return_Pct'])
         df = df.reset_index()
         df['Bank'] = bank
-        
         metrics_list.append(df)
-    
-    if not metrics_list:
-        return pd.DataFrame()
-    
-    return pd.concat(metrics_list, ignore_index=True)
-
+    return pd.concat(metrics_list, ignore_index=True) if metrics_list else pd.DataFrame()
 # -------------------------
 # OUTLIER DETECTION
 # -------------------------
@@ -244,16 +241,8 @@ def outliers_zscore(series: pd.Series, thresh: float = 3.0) -> pd.Series:
 # -------------------------
 # UI: Sidebar
 # -------------------------
-# st.sidebar.title("Kontrol Data")
-# if st.sidebar.button("Update Data (Scrape Ulang dari Yahoo)"):
-#     ok = scrape_and_save()
-#     if ok:
-#         load_all_csvs.clear()
-#         get_all_metrics.clear()
-#         st.rerun()
-
 with st.sidebar:
-    # 1. Header & Logo (Opsional: Bisa ganti emoji dengan st.image logo kampus/perusahaan)
+    # 1. Header & Logo
     st.header("📊Dashboard Analisis Saham Bank BUMN (2014-2024)")
     st.caption("Analisis Saham Bank BUMN Indonesia")
     st.markdown("---")
@@ -269,25 +258,18 @@ with st.sidebar:
         """
     )
     
-    # 3. Fitur Download Data (UTILITY)
-    
-    # 4. Profil Pembuat (PERSONAL BRANDING)
+    # 4. Profil Pembuat
     st.subheader("👤 Author")
     st.markdown("**Kelompok KARASUNO**")
     st.markdown("Universitas Singaperbangsa Karawang")
     
-    # Contoh Link Media Sosial (Opsional)
-
-
     st.markdown("---")
     
-    # 5. Disclaimer (PENTING untuk Data Keuangan)
+    # 5. Disclaimer
     st.caption(
         "⚠️ **Disclaimer:** Dashboard ini dibuat untuk tujuan edukasi dan analisis akademik. "
 
     )
-
-# st.sidebar.caption("Mode: Hybrid (Load CSV, scrape jika perlu)")
 
 # -------------------------
 # MAIN APP: DATA LOADING
@@ -359,9 +341,8 @@ st.metric(label="📄 Total Baris Data (Hasil Filter)", value=total_rows_filtere
 st.markdown("---")
 
 # -------------------------
-# TABS: EDA / Charts / Outliers / Extreme / Recommendation
+# TABS: EDA / Charts / Hist / Outliers / Recommendation
 # -------------------------
-# NAMA TAB DIKEMBALIKAN SESUAI KODE AWAL ANDA
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📊 Data & EDA", 
     "📈 Charts (Trend/Returns)", 
@@ -375,9 +356,8 @@ with tab1:
     st.dataframe(df_filtered_raw, use_container_width=True) 
     st.markdown("---")
 
-    # === INI ADALAH SOLUSI PASTI MUNCUL: EXPANDER DEFINISI ===
+    # === EXPANDER DEFINISI ===
     with st.expander("❓ Klik untuk melihat Deskripsi & Makna Setiap Kolom"):
-        # Kita buat tabel definisi secara manual agar rapi
         definitions_df = pd.DataFrame([
             {'Kolom': 'Open', 'Makna & Tipe Data': 'Harga saat pasar dibuka. (Tipe: float64)'},
             {'Kolom': 'High', 'Makna & Tipe Data': 'Harga tertinggi yang dicapai saham selama perdagangan. (Tipe: float64)'},
@@ -386,7 +366,7 @@ with tab1:
             {'Kolom': 'Adj Close', 'Makna & Tipe Data': 'Nilai riil saham setelah penyesuaian korporasi (dividen, stock split). (Tipe: float64)'},
             {'Kolom': 'Volume', 'Makna & Tipe Data': 'Menggambarkan tingkat aktivitas transaksi saham. (Tipe: int64)'},
         ])
-        st.table(definitions_df.set_index('Kolom')) # Menggunakan st.table agar lebih padat
+        st.table(definitions_df.set_index('Kolom')) 
     # ========================================================
     
     st.subheader("2. Statistik Deskriptif (Per Bank)")
@@ -419,9 +399,13 @@ with tab1:
             )
             
             st.caption(f"Total baris data yang dianalisis: {len(df_bank):,} baris.")
+            
 with tab2:
-    st.subheader("Trend Harga — multi-bank")
-    price_col = 'Adj Close' if 'Adj Close' in df_filtered_raw.columns else ('Close' if 'Close' in df_filtered_raw.columns else detect_price_col(df_filtered_raw))
+    # -------------------------------------
+    # 1. TREN HARGA (Harga Nominal)
+    # -------------------------------------
+    st.subheader("1. Tren Harga Saham (Harga Nominal)")
+    price_col = detect_price_col(df_filtered_raw)
     
     fig_price = px.line(
         df_filtered_raw, 
@@ -435,61 +419,73 @@ with tab2:
         hovermode="x unified", 
         template="plotly_white", 
         height=520,
-        xaxis_title="Tahun",
+        xaxis_title="", # Dihapus agar bersih
         yaxis_title="Harga (IDR)"
     )
-    fig_price.update_traces(
-        hovertemplate="Tanggal: %{x|%Y-%m-%d}<br>" +
-                      "Harga: Rp %{y:,.0f}<extra></extra>"
-    )
+    fig_price.update_traces(hovertemplate="<b>%{data.name}</b><br>Tanggal: %{x|%Y-%m-%d}<br>Harga: Rp %{y:,.0f}<extra></extra>")
     fig_price.update_yaxes(tickprefix="Rp ")
-    fig_price.update_xaxes(dtick="M12", tickformat="%Y")
-    
+    fig_price.update_xaxes(dtick=None, tickformat="%Y") # Menggunakan tick format otomatis
     st.plotly_chart(fig_price, use_container_width=True)
 
     st.markdown("---")
-    st.subheader("Analisis Harga, & Cumulative Return")
+
+    # -------------------------------------
+    # 2. VOLATILITAS (RISIKO) - CHART BARU
+    # -------------------------------------
+    st.subheader("2. Volatilitas 30-Hari (Risiko)")
     
-    if not df_filtered_metrics.empty:
-        fig = make_subplots(rows=3, cols=1, shared_xaxes=True, vertical_spacing=0.04,
-                            subplot_titles=("Harga (Adj Close)", "Cumulative Return (Index)"))
-        
-        for bank in selected_banks:
-            d = df_filtered_metrics[df_filtered_metrics['Bank']==bank]
-            if d.empty: continue
-            
-            bank_color = BANK_COLORS.get(bank, None)
+    fig_volatility = px.line(
+        df_filtered_metrics, 
+        x='Date', 
+        y='Volatility_30d', # Menggunakan Volatilitas dari metrik
+        color='Bank',
+        title="Volatilitas Tahunan Bergulir (30 Hari)",
+        color_discrete_map=BANK_COLORS
+    )
+    # Garis 0.0 penting untuk konteks risiko
+    fig_volatility.add_hline(y=0, line_width=1, line_dash="dash", line_color="gray")
+    
+    fig_volatility.update_layout(
+        template="plotly_white", 
+        height=500,
+        xaxis_title="", 
+        yaxis_title="Indeks Volatilitas (Std Dev)",
+        hovermode="x unified"
+    )
+    fig_volatility.update_traces(hovertemplate="<b>%{data.name}</b><br>Tanggal: %{x|%Y-%m-%d}<br>Volatilitas: %{y:.3f}<extra></extra>")
+    st.plotly_chart(fig_volatility, use_container_width=True)
 
-            fig.add_trace(go.Scatter(
-                x=d['Date'], y=d['Harga'], mode='lines', name=bank, 
-                line=dict(color=bank_color),
-                hovertemplate="Tanggal: %{x|%Y-%m-%d}<br>Harga: Rp %{y:,.0f}<extra></extra>"
-            ), row=1, col=1)
-            
-            
-            fig.add_trace(go.Scatter(
-                x=d['Date'], y=d['Cumulative_Return'], mode='lines', name=bank, showlegend=False, 
-                line=dict(color=bank_color),
-                hovertemplate="Tanggal: %{x|%Y-%m-%d}<br>Cumulative: %{y:.2f}x<extra></extra>"
-            ), row=2, col=1)
-            
-        fig.update_yaxes(title_text="Harga (IDR)", row=1, tickprefix="Rp ")
-        fig.update_yaxes(title_text="Cumulative Index", row=2)
-        
-        fig.update_layout(
-            height=900, 
-            hovermode="x unified", 
-            template="plotly_white",
-            xaxis2_showticklabels=True,
-            xaxis2_dtick="M12",
-            xaxis2_tickformat="%Y",
-            xaxis2_title="Tahun"
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("Tidak ada data metrik yang bisa dihitung untuk bank terpilih.")
+    st.markdown("---")
 
+    # -------------------------------------
+    # 3. RETURN KUMULATIF (PROFIT) - CHART BARU
+    # -------------------------------------
+    st.subheader("3. Return Kumulatif (Kinerja Profit)")
+    st.caption("Menunjukkan pertumbuhan investasi Rp 1 sejak periode awal.")
+    
+    fig_cumulative = px.line(
+        df_filtered_metrics, 
+        x='Date', 
+        y='Cumulative_Return', 
+        color='Bank', 
+        title="Perbandingan Kinerja Kumulatif (Return Index)",
+        color_discrete_map=BANK_COLORS
+    )
+    # Garis 1.0 penting untuk konteks (Break Even Point)
+    fig_cumulative.add_hline(y=1, line_width=1, line_dash="dot", line_color="red") 
+    
+    fig_cumulative.update_layout(
+        template="plotly_white", 
+        height=500,
+        xaxis_title="", 
+        yaxis_title="Indeks Pertumbuhan (x Kali Lipat)",
+        hovermode="x unified"
+    )
+    fig_cumulative.update_traces(hovertemplate="<b>%{data.name}</b><br>Tanggal: %{x|%Y-%m-%d}<br>Pertumbuhan: %{y:.2f}x<extra></extra>")
+    st.plotly_chart(fig_cumulative, use_container_width=True)
+    
+    st.markdown("---")
+    
 with tab3:
     st.subheader("Histogram (per fitur)")
     cols_to_plot = ['Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume']
@@ -515,8 +511,6 @@ with tab4:
     st.subheader("Outlier detection (Z-score)")
     
     # === KONFIGURASI SMART THRESHOLD ===
-    # BBTN dikasih 2.8 agar sejarah 22 outlier-nya muncul
-    # Bank lain (BBRI, BBNI, BMRI) tetap 3.0 agar tidak muncul noise (tetap 0)
     THRESHOLDS = {
         'BBTN': 3.0,
         'BBRI': 3.0, 
@@ -541,7 +535,6 @@ with tab4:
         df_clean = df_full.dropna(subset=[pc])
         
         # 2. Tentukan Threshold Khusus Bank ini
-        # Jika bank ada di daftar THRESHOLDS, pakai nilainya. Jika tidak, pakai 3.0
         current_zt = THRESHOLDS.get(bank, 3.0)
         
         # 3. Hitung
@@ -564,7 +557,7 @@ with tab4:
                 delta="Kejadian Ekstrem" if len(outs) > 0 else "Normal / Stabil",
                 delta_color="inverse" if len(outs) > 0 else "normal"
             )
-            st.caption(f"Z-Score Threshold: {current_zt}") # Tampilkan threshold yang dipakai
+            st.caption(f"Z-Score Threshold: {current_zt}") 
             
             if len(outs) > 0:
                 with st.expander("Lihat Tanggal Kejadian"):
@@ -602,13 +595,13 @@ with tab4:
         
         st.markdown("---")
 
-    # ... (Bagian Extreme movements tetap sama) ...all_trace_data = [] # List untuk plotting
+    all_trace_data = [] 
     st.subheader("2. Rekor Kenaikan & Penurunan Harian Terbesar")
     st.caption("Visualisasi ini menunjukkan pergerakan harga pada hari-hari ekstrem.")
 
     # --- Persiapan Data Ekstrem ---
-    extremes_data = [] # List untuk tabel ringkasan
-    all_trace_data = [] # List untuk plotting
+    extremes_data = [] 
+    all_trace_data = [] 
     for bank in selected_banks:
         if bank not in datasets: continue
         d_raw = datasets[bank].copy()
@@ -629,7 +622,7 @@ with tab4:
             "Min Drop": f"{d_raw.loc[idxmin, 'Ret']:.2f}% ({idxmin.strftime('%Y-%m-%d')})"
         })
         
-        # Simpan untuk plotting (seperti Colab)
+        # Simpan untuk plotting 
         all_trace_data.append({
             'Bank': bank,
             'Date': d_raw.index,
@@ -696,101 +689,6 @@ with tab4:
     st.markdown("#### Tabel Ringkasan Ekstrem")
     st.table(pd.DataFrame(extremes_data).set_index('Bank'))
 
-# with tab4:
-#     st.subheader("Outlier detection (Z-score)")
-#     zt = 3
-#     st.info(f"Analisis dilakukan pada SELURUH data historis (2014-2024) dengan threshold Z-score {zt}.")
-
-#     outlier_summary = []
-    
-#     for bank in selected_banks:
-#         if bank not in datasets: continue
-        
-#         # 1. Data Prep (Full History)
-#         df_full = datasets[bank].copy()
-#         pc = detect_price_col(df_full)
-#         if pc is None: continue
-        
-#         df_full[pc] = pd.to_numeric(df_full[pc], errors='coerce')
-#         df_clean = df_full.dropna(subset=[pc])
-#         outs = outliers_zscore(df_clean[pc], thresh=zt)
-        
-#         # 2. Judul Bank
-#         st.markdown(f"### {bank}")
-        
-#         # 3. Layout 2 Kolom (Balance)
-#         col_left, col_right = st.columns([1, 3])
-        
-#         # --- KOLOM KIRI: METRIK & DATA ---
-#         with col_left:
-#             st.metric(
-#                 label="Jumlah Outlier", 
-#                 value=f"{len(outs)}", 
-#                 delta="Terdeteksi" if len(outs) > 0 else "Aman",
-#                 delta_color="inverse"
-#             )
-#             st.caption(f"Total Data: {len(df_clean)}")
-            
-#             if len(outs) > 0:
-#                 with st.expander("Lihat Data"):
-#                     st.dataframe(outs.to_frame("Harga"), height=200)
-#             else:
-#                 st.success("Data stabil.")
-
-#         # --- KOLOM KANAN: GRAFIK BERSIH (Data-Ink Ratio) ---
-#         with col_right:
-#             # Grafik selalu dibuat agar tidak kosong
-#             fig_out = go.Figure()
-#             color = BANK_COLORS.get(bank, 'blue')
-            
-#             # Garis Harga (Tipis)
-#             fig_out.add_trace(go.Scatter(
-#                 x=df_clean.index, y=df_clean[pc], 
-#                 mode='lines', name='Harga',
-#                 line=dict(color=color, width=1), opacity=0.6,
-#                 hovertemplate="Tanggal: %{x|%Y-%m-%d}<br>Harga: Rp %{y:,.0f}<extra></extra>"
-#             ))
-            
-#             # Titik Outlier (Jika Ada)
-#             if len(outs) > 0:
-#                 fig_out.add_trace(go.Scatter(
-#                     x=outs.index, y=outs.values, 
-#                     mode='markers', name='OUTLIER',
-#                     marker=dict(color='#D6001C', size=6, symbol='x'),
-#                     hovertemplate="<b>OUTLIER</b><br>Tanggal: %{x|%Y-%m-%d}<br>Harga: Rp %{y:,.0f}<extra></extra>"
-#                 ))
-#                 title_text = f"Peta Outlier: {bank}"
-#             else:
-#                 title_text = f"Tren Harga: {bank} (Stabil)"
-
-#             # Gunakan helper untuk bersihkan visual noise
-#             fig_out = clean_chart_layout(fig_out, title=title_text, y_title="Harga (IDR)")
-#             st.plotly_chart(fig_out, use_container_width=True)
-        
-#         st.markdown("---")
-
-#     st.subheader("Extreme movements (max spike / max drop per bank)")
-    
-#     extremes = []
-#     for bank in selected_banks:
-#         if bank not in datasets: continue
-#         d_raw = datasets[bank].copy()
-#         pc = detect_price_col(d_raw)
-#         d_raw[pc] = pd.to_numeric(d_raw[pc], errors='coerce')
-#         d_raw['Ret'] = d_raw[pc].pct_change() * 100
-#         d_raw = d_raw.dropna(subset=['Ret'])
-        
-#         idxmax = d_raw['Ret'].idxmax()
-#         idxmin = d_raw['Ret'].idxmin()
-        
-#         extremes.append({
-#             "Bank": bank,
-#             "Max Spike": f"{d_raw.loc[idxmax, 'Ret']:.2f}% ({idxmax.strftime('%Y-%m-%d')})",
-#             "Max Drop": f"{d_raw.loc[idxmin, 'Ret']:.2f}% ({idxmin.strftime('%Y-%m-%d')})"
-#         })
-    
-#     st.table(pd.DataFrame(extremes).set_index('Bank'))
-
 with tab5:
     st.subheader("Automated Recommendation (simple rule-based)")
     
@@ -827,4 +725,3 @@ with tab5:
 # -------------------------
 st.markdown("---")
 st.caption("Dashboard app: Adapted from Colab visualizations.")
-
