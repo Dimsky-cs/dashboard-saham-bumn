@@ -28,7 +28,7 @@ MASTER_CSV = os.path.join(DATA_FOLDER, "combined_2014_2024.csv")
 BANK_ICONS = {
     "BBRI": "BBRI",
     "BBNI": "BBNI",
-    "BMRI": "BMandiri",
+    "BMRI": "BMRI",
     "BBTN": "BBTN"
 }
 
@@ -827,3 +827,4 @@ with tab5:
 # -------------------------
 st.markdown("---")
 st.caption("Dashboard app: Adapted from Colab visualizations.")
+
