@@ -284,7 +284,7 @@ with st.sidebar:
     # 5. Disclaimer (PENTING untuk Data Keuangan)
     st.caption(
         "⚠️ **Disclaimer:** Dashboard ini dibuat untuk tujuan edukasi dan analisis akademik. "
-        "Bukan merupakan saran investasi profesional."
+
     )
 
 # st.sidebar.caption("Mode: Hybrid (Load CSV, scrape jika perlu)")
@@ -602,9 +602,13 @@ with tab4:
         
         st.markdown("---")
 
-    # ... (Bagian Extreme movements tetap sama) ...
-    st.subheader("Rekor Kenaikan & Penurunan Harian Terbesar")
-    extremes = []
+    # ... (Bagian Extreme movements tetap sama) ...all_trace_data = [] # List untuk plotting
+    st.subheader("2. Rekor Kenaikan & Penurunan Harian Terbesar")
+    st.caption("Visualisasi ini menunjukkan pergerakan harga pada hari-hari ekstrem.")
+
+    # --- Persiapan Data Ekstrem ---
+    extremes_data = [] # List untuk tabel ringkasan
+    all_trace_data = [] # List untuk plotting
     for bank in selected_banks:
         if bank not in datasets: continue
         d_raw = datasets[bank].copy()
@@ -613,16 +617,84 @@ with tab4:
         d_raw['Ret'] = d_raw[pc].pct_change() * 100
         d_raw = d_raw.dropna(subset=['Ret'])
         
+        if d_raw.empty: continue
+        
         idxmax = d_raw['Ret'].idxmax()
         idxmin = d_raw['Ret'].idxmin()
         
-        extremes.append({
+        # Simpan untuk tabel
+        extremes_data.append({
             "Bank": bank,
-            "Kenaikan Tertinggi (Spike)": f"{d_raw.loc[idxmax, 'Ret']:.2f}% pada {idxmax.strftime('%Y-%m-%d')}",
-            "Penurunan Terdalam (Drop)": f"{d_raw.loc[idxmin, 'Ret']:.2f}% pada {idxmin.strftime('%Y-%m-%d')}"
+            "Max Spike": f"+{d_raw.loc[idxmax, 'Ret']:.2f}% ({idxmax.strftime('%Y-%m-%d')})",
+            "Min Drop": f"{d_raw.loc[idxmin, 'Ret']:.2f}% ({idxmin.strftime('%Y-%m-%d')})"
         })
-    
-    st.table(pd.DataFrame(extremes).set_index('Bank'))
+        
+        # Simpan untuk plotting (seperti Colab)
+        all_trace_data.append({
+            'Bank': bank,
+            'Date': d_raw.index,
+            'Price': d_raw[pc],
+            'MaxSpikeDate': idxmax,
+            'MaxSpikePrice': d_raw.loc[idxmax, pc],
+            'MinDropDate': idxmin,
+            'MinDropPrice': d_raw.loc[idxmin, pc],
+            'MaxSpikeRet': d_raw.loc[idxmax, 'Ret'],
+            'MinDropRet': d_raw.loc[idxmin, 'Ret'],
+            'Color': BANK_COLORS.get(bank)
+        })
+
+    # === PLOT 1: LONJAKAN TERTINGGI (MAX SPIKE) ===
+    if all_trace_data:
+        st.markdown("#### Lonjakan Tertinggi (Max Spike) Seluruh Bank")
+        fig_spike = go.Figure()
+        
+        for data in all_trace_data:
+            # Garis Tren (Warna Bank, Pudar)
+            fig_spike.add_trace(go.Scatter(
+                x=data['Date'], y=data['Price'], mode='lines', name=data['Bank'],
+                line=dict(color=data['Color'], width=1), opacity=0.5,
+                showlegend=False,
+                hovertemplate="Tanggal: %{x|%Y-%m-%d}<br>Harga: Rp %{y:,.0f}<extra></extra>"
+            ))
+            # Titik Marker Spike (Warna Merah/Hitam, Tebal)
+            fig_spike.add_trace(go.Scatter(
+                x=[data['MaxSpikeDate']], y=[data['MaxSpikePrice']], mode='markers',
+                marker=dict(size=12, symbol='triangle-up', color='black', 
+                            line=dict(width=2, color=data['Color'])),
+                name=f"SPIKE {data['Bank']}",
+                hovertemplate=f"<b>SPIKE {data['Bank']}</b><br>Tanggal: {data['MaxSpikeDate'].strftime('%Y-%m-%d')}<br>Return: +{data['MaxSpikeRet']:.2f}%%<extra></extra>"
+            ))
+
+        fig_spike.update_layout(height=450, title="Perbandingan Hari Kenaikan Ekstrem", template="plotly_white")
+        st.plotly_chart(fig_spike, use_container_width=True)
+        
+    # === PLOT 2: PENURUNAN TERDALAM (MAX DROP) ===
+        st.markdown("#### Penurunan Terdalam (Max Drop) Seluruh Bank")
+        fig_drop = go.Figure()
+
+        for data in all_trace_data:
+            # Garis Tren (Warna Bank, Pudar)
+            fig_drop.add_trace(go.Scatter(
+                x=data['Date'], y=data['Price'], mode='lines', name=data['Bank'],
+                line=dict(color=data['Color'], width=1), opacity=0.5,
+                showlegend=False,
+                hovertemplate="Tanggal: %{x|%Y-%m-%d}<br>Harga: Rp %{y:,.0f}<extra></extra>"
+            ))
+            # Titik Marker Drop (Warna Hitam, Tebal)
+            fig_drop.add_trace(go.Scatter(
+                x=[data['MinDropDate']], y=[data['MinDropPrice']], mode='markers',
+                marker=dict(size=12, symbol='triangle-down', color='black', 
+                            line=dict(width=2, color=data['Color'])),
+                name=f"DROP {data['Bank']}",
+                hovertemplate=f"<b>DROP {data['Bank']}</b><br>Tanggal: {data['MinDropDate'].strftime('%Y-%m-%d')}<br>Return: {data['MinDropRet']:.2f}%%<extra></extra>"
+            ))
+
+        fig_drop.update_layout(height=450, title="Perbandingan Hari Penurunan Ekstrem", template="plotly_white")
+        st.plotly_chart(fig_drop, use_container_width=True)
+
+    # --- Tabel Ringkasan ---
+    st.markdown("#### Tabel Ringkasan Ekstrem")
+    st.table(pd.DataFrame(extremes_data).set_index('Bank'))
 
 # with tab4:
 #     st.subheader("Outlier detection (Z-score)")
