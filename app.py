@@ -25,11 +25,29 @@ BANK_CODES = [t.replace(".JK", "") for t in TICKERS]
 CSV_FILES = {bank: os.path.join(DATA_FOLDER, f"{bank}_2014_2024.csv") for bank in BANK_CODES}
 MASTER_CSV = os.path.join(DATA_FOLDER, "combined_2014_2024.csv")
 
+BANK_ICONS = {
+    "BBRI": "BBRI",
+    "BBNI": "BBNI",
+    "BMRI": "BMandiri",
+    "BBTN": "BBTN"
+}
+
 BANK_COLORS = {
-    'BBRI': '#00529C', # BRI Biru
-    'BBNI': "#005E6A", # Tosca BNI (Digelapkan sedikit agar kontras di background putih)
-    'BMRI': '#F3A800', # Mandiri Emas
-    'BBTN': '#EC1C24'  # BTN Merah
+    'BBRI': "#080BB5", 
+    'BBNI': "#025A3E",
+    'BMRI': '#FFB700', 
+    'BBTN': "#EC080F"
+
+}
+
+# Tambahkan TOOLTIP_DATA di bawah BANK_COLORS
+TOOLTIP_DATA = {
+    'Open': "Tipe: float64. Harga saham saat pasar dibuka pada hari itu.",
+    'High': "Tipe: float64. Harga tertinggi yang dicapai saham selama perdagangan.",
+    'Low': "Tipe: float64. Harga terendah yang dicapai saham selama perdagangan.",
+    'Close': "Tipe: float64. Harga terakhir saham sebelum pasar ditutup.",
+    'Adj Close': "Tipe: float64. Nilai riil saham setelah penyesuaian korporasi (dividen, stock split, dll).",
+    'Volume': "Tipe: int64. Menggambarkan tingkat aktivitas transaksi saham.",
 }
 
 # -------------------------
@@ -197,7 +215,6 @@ def get_all_metrics(_datasets: Dict[str, pd.DataFrame]) -> pd.DataFrame:
         df = df.dropna(subset=[pc])
         
         df['Return'] = df[pc].pct_change()
-        df['Volatility_30d'] = df['Return'].rolling(window=30).std() * np.sqrt(252)
         df['Cumulative_Return'] = (1 + df['Return']).cumprod()
         df['Daily_Return_Pct'] = df['Return'] * 100
         df['Harga'] = df[pc]
@@ -235,8 +252,41 @@ def outliers_zscore(series: pd.Series, thresh: float = 3.0) -> pd.Series:
 #         get_all_metrics.clear()
 #         st.rerun()
 
-st.sidebar.write("Data folder:", DATA_FOLDER)
-st.sidebar.write("Tickers:", ", ".join(TICKERS))
+with st.sidebar:
+    # 1. Header & Logo (Opsional: Bisa ganti emoji dengan st.image logo kampus/perusahaan)
+    st.header("📊Dashboard Analisis Saham Bank BUMN (2014-2024)")
+    st.caption("Analisis Saham Bank BUMN Indonesia")
+    st.markdown("---")
+
+    # 2. About / Deskripsi
+    st.subheader("ℹ️ Tentang Dashboard")
+    st.info(
+        """
+        Dashboard ini memvisualisasikan kinerja historis 4 Bank BUMN terbesar 
+        (BBRI, BBNI, BMRI, BBTN) dari tahun 2014 hingga 2024.
+        
+        **Data Source:** Yahoo Finance
+        """
+    )
+    
+    # 3. Fitur Download Data (UTILITY)
+    
+    # 4. Profil Pembuat (PERSONAL BRANDING)
+    st.subheader("👤 Author")
+    st.markdown("**Kelompok KARASUNO**")
+    st.markdown("Universitas Singaperbangsa Karawang")
+    
+    # Contoh Link Media Sosial (Opsional)
+
+
+    st.markdown("---")
+    
+    # 5. Disclaimer (PENTING untuk Data Keuangan)
+    st.caption(
+        "⚠️ **Disclaimer:** Dashboard ini dibuat untuk tujuan edukasi dan analisis akademik. "
+        "Bukan merupakan saran investasi profesional."
+    )
+
 # st.sidebar.caption("Mode: Hybrid (Load CSV, scrape jika perlu)")
 
 # -------------------------
@@ -314,18 +364,61 @@ st.markdown("---")
 # NAMA TAB DIKEMBALIKAN SESUAI KODE AWAL ANDA
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📊 Data & EDA", 
-    "📈 Charts (Trend/Vol/Returns)", 
+    "📈 Charts (Trend/Returns)", 
     "📦 Hist", 
     "🚨 Outliers & Extreme", 
     "💡 Recommendation"
 ])
 
 with tab1:
-    st.subheader("Sample Data Mentah (filtered)")
-    st.dataframe(df_filtered_raw.head(200))
-    st.markdown("*Descriptive statistics (numeric)*")
-    st.dataframe(df_filtered_raw.select_dtypes(include=[np.number]).describe().T)
+    st.subheader("1. Sample Data Mentah (Filtered)")
+    st.dataframe(df_filtered_raw, use_container_width=True) 
+    st.markdown("---")
 
+    # === INI ADALAH SOLUSI PASTI MUNCUL: EXPANDER DEFINISI ===
+    with st.expander("❓ Klik untuk melihat Deskripsi & Makna Setiap Kolom"):
+        # Kita buat tabel definisi secara manual agar rapi
+        definitions_df = pd.DataFrame([
+            {'Kolom': 'Open', 'Makna & Tipe Data': 'Harga saat pasar dibuka. (Tipe: float64)'},
+            {'Kolom': 'High', 'Makna & Tipe Data': 'Harga tertinggi yang dicapai saham selama perdagangan. (Tipe: float64)'},
+            {'Kolom': 'Low', 'Makna & Tipe Data': 'Harga terendah yang dicapai saham selama perdagangan. (Tipe: float64)'},
+            {'Kolom': 'Close', 'Makna & Tipe Data': 'Harga terakhir saham sebelum pasar ditutup. (Tipe: float64)'},
+            {'Kolom': 'Adj Close', 'Makna & Tipe Data': 'Nilai riil saham setelah penyesuaian korporasi (dividen, stock split). (Tipe: float64)'},
+            {'Kolom': 'Volume', 'Makna & Tipe Data': 'Menggambarkan tingkat aktivitas transaksi saham. (Tipe: int64)'},
+        ])
+        st.table(definitions_df.set_index('Kolom')) # Menggunakan st.table agar lebih padat
+    # ========================================================
+    
+    st.subheader("2. Statistik Deskriptif (Per Bank)")
+    st.caption("Statistik di bawah ini dihitung berdasarkan rentang waktu yang Anda pilih di filter atas.")
+
+    for bank_code in selected_banks:
+        if bank_code in datasets:
+            df_bank = datasets[bank_code].copy() 
+            
+            if 'Date' in df_bank.columns:
+                df_bank = df_bank.set_index('Date')
+            
+            start_date, end_date = date_range 
+            df_bank = df_bank.loc[start_date.strftime('%Y-%m-%d'):end_date.strftime('%Y-%m-%d')]
+
+            if df_bank.empty:
+                st.warning(f"Tidak ada data untuk {bank_code} dalam rentang ini.")
+                continue
+
+            desc = df_bank.describe(include=[np.number]).T
+            desc['median'] = df_bank.median(numeric_only=True)
+            
+            cols_to_show = ["count", "mean", "median", "std", "min", "max"]
+            stats_df = desc[cols_to_show].dropna(how='all')
+            
+            st.markdown(f"#### Statistik Deskriptif - {BANK_ICONS.get(bank_code, bank_code)}")
+            st.dataframe(
+                stats_df.style.background_gradient(cmap='Blues').format('{:.2f}'),
+                use_container_width=True
+            )
+            
+            st.caption(f"Total baris data yang dianalisis: {len(df_bank):,} baris.")
 with tab2:
     st.subheader("Trend Harga — multi-bank")
     price_col = 'Adj Close' if 'Adj Close' in df_filtered_raw.columns else ('Close' if 'Close' in df_filtered_raw.columns else detect_price_col(df_filtered_raw))
@@ -373,11 +466,6 @@ with tab2:
                 hovertemplate="Tanggal: %{x|%Y-%m-%d}<br>Harga: Rp %{y:,.0f}<extra></extra>"
             ), row=1, col=1)
             
-            # fig.add_trace(go.Scatter(
-            #     x=d['Date'], y=d['Volatility_30d'], mode='lines', name=bank, showlegend=False, 
-            #     line=dict(color=bank_color),
-            #     hovertemplate="Tanggal: %{x|%Y-%m-%d}<br>Volatility: %{y:.3f}<extra></extra>"
-            # ), row=2, col=1)
             
             fig.add_trace(go.Scatter(
                 x=d['Date'], y=d['Cumulative_Return'], mode='lines', name=bank, showlegend=False, 
@@ -386,7 +474,6 @@ with tab2:
             ), row=2, col=1)
             
         fig.update_yaxes(title_text="Harga (IDR)", row=1, tickprefix="Rp ")
-        # fig.update_yaxes(title_text="Volatility", row=2)
         fig.update_yaxes(title_text="Cumulative Index", row=2)
         
         fig.update_layout(
